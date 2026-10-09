@@ -12,6 +12,7 @@ from freerun.colors import ColorScheme, PALETTES
 from freerun.encoder import VideoEncoder, get_audio_duration, detect_best_encoder
 from freerun.geometry import PianoLayout
 from freerun.midi import parse_midi
+from freerun.overlay import auto_detect_metadata
 from freerun.renderer import FreerunRenderer
 
 
@@ -30,6 +31,15 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument("-a", "--audio", dest="audio_opt", default=None, help="Path to input audio file")
     parser.add_argument("-m", "--midi", dest="midi_opt", default=None, help="Path to input MIDI file")
     parser.add_argument("-o", "--output", dest="output_opt", default=None, help="Output MP4 file path")
+
+    # Title & Metadata Overlay
+    title_group = parser.add_argument_group("On-Screen Title & Instrument Badge")
+    title_group.add_argument("-t", "--title", "--name", "--song", dest="title", default=None, help="Music title to display on screen")
+    title_group.add_argument("-i", "--instruments", "--instrument", dest="instruments", default=None, help="Instrument(s) used (e.g. 'Grand Piano' or 'Piano, Strings')")
+    title_group.add_argument("--artist", default=None, help="Artist or composer name")
+    title_group.add_argument("--title-duration", type=float, default=7.0, help="Duration (seconds) to display title card (0 for persistent)")
+    title_group.add_argument("--persistent-title", action="store_true", help="Keep title badge visible throughout entire video")
+    title_group.add_argument("--no-title", action="store_true", help="Disable the title card badge overlay")
 
     # Resolution & Frame Rate
     video_group = parser.add_argument_group("Video Settings")
@@ -148,6 +158,26 @@ def run():
     width = (args.width // 2) * 2
     height = (args.height // 2) * 2
 
+    # Determine Title and Instruments for On-Screen Overlay
+    title_to_show = None
+    instruments_to_show = None
+    artist_to_show = args.artist
+
+    if not args.no_title:
+        title_to_show = args.title
+        instruments_to_show = args.instruments
+
+        if not title_to_show or not instruments_to_show:
+            auto_t, auto_art, auto_inst = auto_detect_metadata(args.audio_file, args.midi_file)
+            if not title_to_show and auto_t:
+                title_to_show = auto_t
+            if not artist_to_show and auto_art:
+                artist_to_show = auto_art
+            if not instruments_to_show and auto_inst:
+                instruments_to_show = auto_inst
+
+    title_duration = 0.0 if args.persistent_title else args.title_duration
+
     print("=" * 64)
     print("  FREERUN - Ultra-fast GPU Piano Visualizer")
     print("=" * 64)
@@ -156,6 +186,12 @@ def run():
     print(f" • Output File    : {args.output_file}")
     print(f" • Resolution     : {width}x{height} @ {args.fps} FPS")
     print(f" • Palette        : {args.color_scheme}")
+    if title_to_show:
+        print(f" • Title          : {title_to_show}")
+    if artist_to_show:
+        print(f" • Artist         : {artist_to_show}")
+    if instruments_to_show:
+        print(f" • Instrument(s)  : {instruments_to_show}")
 
     # 1. Parse MIDI
     print("\n[1/4] Parsing MIDI file...")
@@ -215,8 +251,14 @@ def run():
         layout=layout,
         midi_info=midi_info,
         fall_duration=args.fall_time,
+        lead_in=lead_in,
         enable_particles=args.particles,
         enable_glow=args.glow,
+        title=title_to_show,
+        instruments=instruments_to_show,
+        artist=artist_to_show,
+        title_duration=title_duration,
+        accent_color=color_scheme.get_color(60)[:3],
     )
     print(f"      Renderer ready: {renderer.ctx.info.get('GL_RENDERER', 'OpenGL')} ({time.perf_counter() - t_init:.2f}s)")
 

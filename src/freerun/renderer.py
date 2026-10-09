@@ -9,6 +9,7 @@ import numpy as np
 from freerun.geometry import PianoLayout
 from freerun.midi import MidiTrackInfo
 from freerun.particles import ParticleSystem
+from freerun.overlay import TitleCardOverlay
 from freerun import shaders
 
 
@@ -22,14 +23,21 @@ class FreerunRenderer:
         layout: PianoLayout | None = None,
         midi_info: MidiTrackInfo | None = None,
         fall_duration: float = 2.5,
+        lead_in: float = 2.5,
         enable_particles: bool = True,
         enable_glow: bool = True,
+        title: str | None = None,
+        instruments: str | None = None,
+        artist: str | None = None,
+        title_duration: float = 7.0,
+        accent_color: Tuple[float, float, float] = (0.0, 0.95, 1.0),
     ):
         self.width = width
         self.height = height
         self.layout = layout or PianoLayout()
         self.midi = midi_info
         self.fall_duration = fall_duration
+        self.lead_in = lead_in
         self.enable_particles = enable_particles
         self.enable_glow = enable_glow
 
@@ -144,6 +152,18 @@ class FreerunRenderer:
                 (self.centered_quad_vbo, "2f", "in_vert"),
                 (self.spark_vbo, "4f 4f/i", "in_pos_size", "in_color"),
             ],
+        )
+
+        # Title and Instrument Card Overlay
+        self.title_overlay = TitleCardOverlay(
+            ctx=self.ctx,
+            screen_width=self.width,
+            screen_height=self.height,
+            title=title,
+            instruments=instruments,
+            artist=artist,
+            accent_color=accent_color,
+            duration=title_duration,
         )
 
         # Fast search state for notes
@@ -370,6 +390,10 @@ class FreerunRenderer:
         self.ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
         self.wk_vao.render(moderngl.TRIANGLE_STRIP, instances=len(self.wk_data))
         self.bk_vao.render(moderngl.TRIANGLE_STRIP, instances=len(self.bk_data))
+
+        # 7. Title & Instrument Badge Overlay
+        t_video = t + self.lead_in
+        self.title_overlay.render(t_video)
 
         # Read Framebuffer (RGBA 4-components for maximum DMA speed)
         return self.fbo.read(components=4)

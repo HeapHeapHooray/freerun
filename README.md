@@ -36,6 +36,9 @@ The name **Freerun** is a play on *freefall* (the notes cascading down from the 
   - `fire` (red hot flame and blazing yellow)
   - `tracks` (independent color per MIDI track / hand)
   - Custom hex colors (`--color-left`, `--color-right`)
+- 🏷️ **On-Screen Title & Instrument Badge**:
+  - Displays music name (`--title`), instrument(s) used (`--instruments`), and artist (`--artist`) in a broadcast-style frosted glass badge with smooth fade animations.
+  - Automatic metadata detection from MP3 ID3 tags and MIDI track names.
 - ⏱️ **Audio Synchronization**:
   - Automatic lead-in delay (`--lead-in`) so the first notes fall smoothly into view before hitting keys.
   - Single-pass video encoding and audio muxing (no intermediate raw video files on disk).
@@ -90,7 +93,12 @@ uv run freerun song.mp3 song.mid -o visualizer.mp4 -c rainbow --lead-in 3.0 --fa
 uv run freerun song.mp3 song.mid -o visualizer.mp4 --color-left "#00f2fe" --color-right "#ff0844"
 ```
 
-### 6. Force Specific Video Encoder
+### 6. Display Song Title, Instruments, and Artist
+```bash
+uv run freerun song.mp3 song.mid -t "Moonlight Sonata" -i "Grand Piano" --artist "Beethoven"
+```
+
+### 7. Force Specific Video Encoder
 ```bash
 # Force VAAPI hardware encoding
 uv run freerun song.mp3 song.mid --encoder vaapi
@@ -104,8 +112,10 @@ uv run freerun song.mp3 song.mid --encoder libx264
 ## ⚙️ CLI Reference
 
 ```
-usage: freerun [-h] [-a AUDIO_OPT] [-m MIDI_OPT] [-o OUTPUT_OPT] [-w WIDTH]
-               [-H HEIGHT] [-r FPS] [--720p] [--1080p] [--4k]
+usage: freerun [-h] [-a AUDIO_OPT] [-m MIDI_OPT] [-o OUTPUT_OPT]
+               [-t TITLE] [-i INSTRUMENTS] [--artist ARTIST]
+               [--title-duration TITLE_DURATION] [--persistent-title] [--no-title]
+               [-w WIDTH] [-H HEIGHT] [-r FPS] [--720p] [--1080p] [--4k]
                [--lead-in LEAD_IN] [--fall-time FALL_TIME]
                [--audio-offset AUDIO_OFFSET] [--duration DURATION]
                [-c {neon,synthwave,rainbow,sunset,ocean,emerald,fire,tracks}]
@@ -122,6 +132,12 @@ usage: freerun [-h] [-a AUDIO_OPT] [-m MIDI_OPT] [-o OUTPUT_OPT] [-w WIDTH]
 | `audio` | Positional / `-a` | Path to audio file (`.mp3`, `.wav`, etc.) |
 | `midi` | Positional / `-m` | Path to MIDI file (`.mid`, `.midi`) |
 | `output` | Positional / `-o` | Output video filename (`.mp4`) |
+| `-t, --title` | Auto-detect | Music title displayed on the on-screen badge |
+| `-i, --instruments` | Auto-detect | Instrument(s) used (e.g. `Grand Piano`, `Synth, Strings`) |
+| `--artist` | Auto-detect | Artist or composer name |
+| `--title-duration` | `7.0` | Seconds to display title badge (set `0` for persistent) |
+| `--persistent-title`| `False` | Keep title badge visible throughout entire video |
+| `--no-title` | `False` | Disable title badge overlay completely |
 | `-w, --width` | `1920` | Video width |
 | `-H, --height` | `1080` | Video height |
 | `-r, --fps` | `60` | Frame rate |
