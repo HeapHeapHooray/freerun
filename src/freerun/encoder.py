@@ -133,7 +133,7 @@ class VideoEncoder:
         self.is_closed = False
 
     def _build_and_start_process(self, crf: int, preset: str):
-        cmd = ["ffmpeg", "-y"]
+        cmd = ["ffmpeg", "-y", "-loglevel", "error"]
 
         # Hardware initialization if using VAAPI
         if self.encoder == "vaapi":
@@ -221,6 +221,21 @@ class VideoEncoder:
             stderr=subprocess.PIPE,
         )
 
+        self.stderr_lines: list[str] = []
+
+        def _stderr_reader():
+            try:
+                if self.proc.stderr:
+                    for line in iter(self.proc.stderr.readline, b""):
+                        self.stderr_lines.append(line.decode("utf-8", errors="ignore"))
+                        if len(self.stderr_lines) > 200:
+                            self.stderr_lines.pop(0)
+            except Exception:
+                pass
+
+        self.stderr_thread = threading.Thread(target=_stderr_reader, daemon=True)
+        self.stderr_thread.start()
+
     def _pipe_writer(self):
         try:
             while True:
@@ -236,8 +251,8 @@ class VideoEncoder:
     def write_frame(self, frame_bytes: bytes):
         """Pushes a frame to the async encoder queue."""
         if self.proc.poll() is not None:
-            err = self.proc.stderr.read().decode("utf-8", errors="ignore") if self.proc.stderr else ""
-            raise RuntimeError(f"FFmpeg process exited prematurely: {err}")
+            err = "".join(self.stderr_lines).strip()
+            raise RuntimeError(f"FFmpeg process exited prematurely (code {self.proc.returncode}): {err}")
         self.queue.put(frame_bytes)
 
     def close(self):
@@ -255,7 +270,8 @@ class VideoEncoder:
             except (BrokenPipeError, OSError):
                 pass
 
-        stdout, stderr = self.proc.communicate()
+        self.proc.wait()
+        self.stderr_thread.join(timeout=2.0)
         if self.proc.returncode != 0:
-            err_msg = stderr.decode("utf-8", errors="ignore") if stderr else "Unknown FFmpeg error"
+            err_msg = "".join(self.stderr_lines).strip() or "Unknown FFmpeg error"
             raise RuntimeError(f"FFmpeg encoding failed (code {self.proc.returncode}): {err_msg}")
